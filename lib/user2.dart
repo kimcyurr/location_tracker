@@ -92,6 +92,7 @@
 // import 'package:flutter/material.dart';
 // import 'package:geolocator/geolocator.dart';
 // import 'package:http/http.dart' as http;
+// import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 // void main() {
 //   runApp(MyApp());
@@ -110,12 +111,12 @@
 // }
 
 // class _LocationPageState extends State<LocationPage> {
-//   String status = "Ready";
-
-//   // ⚠️ CHANGE THIS IF USING REAL DEVICE
 //   String baseUrl = "http://localhost:8000";
-//   // Example:
-//   // String baseUrl = "http://192.168.1.5:8000";
+
+//   GoogleMapController? mapController;
+
+//   LatLng user1Location = LatLng(0, 0);
+//   LatLng user2Location = LatLng(0, 0);
 
 //   Timer? timer;
 
@@ -123,9 +124,10 @@
 //   void initState() {
 //     super.initState();
 
-//     // 🔄 Auto fetch other user location every 5 seconds
+//     // Auto update every 5 seconds
 //     timer = Timer.periodic(Duration(seconds: 5), (timer) {
-//       getOtherUserLocation();
+//       getUser1Location();
+//       getUser2Location();
 //     });
 //   }
 
@@ -135,102 +137,118 @@
 //     super.dispose();
 //   }
 
-//   // 📍 SEND YOUR LOCATION
-//   Future<void> sendLocation() async {
-//     try {
-//       LocationPermission permission = await Geolocator.requestPermission();
+//   // SEND LOCATION AS USER 1
+//   Future<void> sendUser1Location() async {
+//     Position position = await Geolocator.getCurrentPosition(
+//       desiredAccuracy: LocationAccuracy.high,
+//     );
 
-//       if (permission == LocationPermission.denied) {
-//         setState(() {
-//           status = "Location permission denied";
-//         });
-//         return;
-//       }
+//     double lat = position.latitude;
+//     double lng = position.longitude;
 
-//       Position position = await Geolocator.getCurrentPosition(
-//         desiredAccuracy: LocationAccuracy.high,
-//       );
+//     var url = Uri.parse(
+//       "$baseUrl/update-location?user_id=user1&latitude=$lat&longitude=$lng",
+//     );
 
-//       double lat = position.latitude;
-//       double lng = position.longitude;
-
-//       var url = Uri.parse(
-//         "$baseUrl/update-location?user_id=user1&latitude=$lat&longitude=$lng",
-//       );
-
-//       var response = await http.post(url);
-
-//       if (response.statusCode == 200) {
-//         setState(() {
-//           status = "✅ Sent:\nLat: $lat\nLng: $lng";
-//         });
-//       } else {
-//         setState(() {
-//           status = "❌ Failed to send location";
-//         });
-//       }
-//     } catch (e) {
-//       setState(() {
-//         status = "Error: $e";
-//       });
-//     }
+//     await http.post(url);
 //   }
 
-//   // 👀 GET OTHER USER LOCATION
-//   Future<void> getOtherUserLocation() async {
+//   // SEND LOCATION AS USER 2
+//   Future<void> sendUser2Location() async {
+//     Position position = await Geolocator.getCurrentPosition(
+//       desiredAccuracy: LocationAccuracy.high,
+//     );
+
+//     double lat = position.latitude;
+//     double lng = position.longitude;
+
+//     var url = Uri.parse(
+//       "$baseUrl/update-location?user_id=user2&latitude=$lat&longitude=$lng",
+//     );
+
+//     await http.post(url);
+//   }
+
+//   // GET USER 1 LOCATION
+//   Future<void> getUser1Location() async {
 //     try {
 //       var url = Uri.parse("$baseUrl/get-location/user1");
-
 //       var response = await http.get(url);
 
 //       if (response.statusCode == 200) {
 //         var data = jsonDecode(response.body);
 
 //         setState(() {
-//           status =
-//               "👤 User1 Location:\nLat: ${data['latitude']}\nLng: ${data['longitude']}";
+//           user1Location = LatLng(data['latitude'], data['longitude']);
 //         });
 //       }
 //     } catch (e) {
-//       setState(() {
-//         status = "Error fetching: $e";
-//       });
+//       print("Error loading user1: $e");
+//     }
+//   }
+
+//   // GET USER 2 LOCATION
+//   Future<void> getUser2Location() async {
+//     try {
+//       var url = Uri.parse("$baseUrl/get-location/user2");
+//       var response = await http.get(url);
+
+//       if (response.statusCode == 200) {
+//         var data = jsonDecode(response.body);
+
+//         setState(() {
+//           user2Location = LatLng(data['latitude'], data['longitude']);
+//         });
+//       }
+//     } catch (e) {
+//       print("Error loading user2: $e");
 //     }
 //   }
 
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
-//       appBar: AppBar(title: Text("IoT Location Tracker")),
-//       body: Center(
-//         child: Padding(
-//           padding: const EdgeInsets.all(20),
-//           child: Column(
-//             mainAxisAlignment: MainAxisAlignment.center,
-//             children: [
-//               Text(
-//                 status,
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(fontSize: 16),
-//               ),
-//               SizedBox(height: 30),
-
-//               // SEND BUTTON
-//               ElevatedButton(
-//                 onPressed: sendLocation,
-//                 child: Text("Send My Location"),
-//               ),
-
-//               SizedBox(height: 15),
-
-//               // GET BUTTON
-//               ElevatedButton(
-//                 onPressed: getOtherUserLocation,
-//                 child: Text("Get User1 Location"),
-//               ),
-//             ],
+//       appBar: AppBar(title: Text("Live Map Tracker")),
+//       body: GoogleMap(
+//         initialCameraPosition: CameraPosition(target: user1Location, zoom: 15),
+//         onMapCreated: (controller) {
+//           mapController = controller;
+//         },
+//         markers: {
+//           Marker(
+//             markerId: MarkerId("user1"),
+//             position: user1Location,
+//             infoWindow: InfoWindow(
+//               title: "User ID: user1",
+//               snippet: "Current Location",
+//             ),
 //           ),
-//         ),
+//           Marker(
+//             markerId: MarkerId("user2"),
+//             position: user2Location,
+//             infoWindow: InfoWindow(
+//               title: "User ID: user2",
+//               snippet: "Current Location",
+//             ),
+//           ),
+//         },
+//       ),
+
+//       floatingActionButton: Column(
+//         mainAxisAlignment: MainAxisAlignment.end,
+//         children: [
+//           FloatingActionButton(
+//             heroTag: "user1",
+//             onPressed: sendUser1Location,
+//             child: Icon(Icons.person),
+//           ),
+//           SizedBox(height: 10),
+//           FloatingActionButton(
+//             heroTag: "user2",
+//             onPressed: sendUser2Location,
+//             child: Icon(Icons.people),
+//           ),
+//         ],
 //       ),
 //     );
 //   }
